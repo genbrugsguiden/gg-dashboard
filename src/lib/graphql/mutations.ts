@@ -56,3 +56,47 @@ export const DELETE_REQUESTED_ITEM = gql`
     deleteRequestedItem(id: $id)
   }
 `;
+
+export const CREATE_GOLDEN_FROM_REQUEST = gql`
+  mutation CreateGoldenFromRequest($data: CreateGoldenFromRequestInput!) {
+    createGoldenFromRequest(data: $data) {
+      id
+      title
+      notes
+      isActive
+      status
+      stationId
+      organizationId
+      sourceRequestId
+      items {
+        id
+        name
+        aliases
+        isActive
+        fractionId
+      }
+    }
+  }
+`;
+
+export const PUBLISH_GOLDEN_FROM_REQUEST = gql`
+  mutation PublishGoldenFromRequest($data: PublishGoldenFromRequestInput!) {
+    publishGoldenFromRequest(data: $data) {
+      id
+      title
+      notes
+      isActive
+      status
+      stationId
+      organizationId
+      sourceRequestId
+      items {
+        id
+        name
+        aliases
+        isActive
+        fractionId
+      }
+    }
+  }
+`;

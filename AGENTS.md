@@ -1,10 +1,12 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code when working with the gg-dashboard frontend.
+This file provides guidance to agents when working with the gg-dashboard frontend.
 
 ## Project Overview
 
 Staff dashboard for curating AI-generated waste sorting classifications. Built with Next.js 16 and Apollo Client for GraphQL communication with the NestJS backend.
+
+**Repo location:** `/Users/lucapurcilly/Git/EcoSort/gg-dashboard`
 
 **Tech Stack:** TypeScript, Next.js 16, React 19, Apollo Client, Tailwind CSS 4, shadcn/ui, React Hook Form, Zod
 
@@ -213,3 +215,4 @@ NEXT_PUBLIC_GRAPHQL_URL=http://localhost:3001/graphql
 - Date formatting uses Danish locale (`da-DK`)
 - Refetch queries after mutations to update UI
 - Use `toast` from Sonner for notifications
+- Always add or update tests (unit/e2e) when changing behavior or data flow

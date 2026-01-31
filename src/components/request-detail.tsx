@@ -9,7 +9,17 @@ import {
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { CheckCircle2, Clock, Calendar, User, ImageIcon, Hash, ZoomIn, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  Clock,
+  Calendar,
+  User,
+  ImageIcon,
+  Hash,
+  ZoomIn,
+  X,
+  Sparkles,
+} from 'lucide-react';
 import type { RequestModel } from '@/types/graphql';
 
 interface RequestDetailProps {
@@ -39,17 +49,25 @@ export function RequestDetail({ request }: RequestDetailProps) {
             </div>
             <h3 className="m-0 text-xl font-semibold leading-none tracking-tight">Request Details</h3>
           </div>
-          {request.isCurated ? (
-            <Badge className="bg-success text-success-foreground shadow-sm badge-glow-success">
-              <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-              Curated
-            </Badge>
-          ) : (
-            <Badge variant="secondary" className="shadow-sm">
-              <Clock className="mr-1.5 h-3.5 w-3.5" />
-              Pending Curation
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {request.goldenStatus === 'PUBLISHED' && (
+              <Badge className="bg-amber-50 text-amber-800 border-amber-200 shadow-sm">
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Golden
+              </Badge>
+            )}
+            {request.isCurated ? (
+              <Badge className="bg-success text-success-foreground shadow-sm badge-glow-success">
+                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                Curated
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="shadow-sm">
+                <Clock className="mr-1.5 h-3.5 w-3.5" />
+                Pending Curation
+              </Badge>
+            )}
+          </div>
         </div>
         <CardContent className="space-y-4 pt-4 pb-5">
           {/* Image */}
@@ -142,6 +160,17 @@ export function RequestDetail({ request }: RequestDetailProps) {
               <span className="font-mono text-xs text-muted-foreground">{request.id}</span>
             </div>
           </div>
+
+          {request.aiResponseText && (
+            <details className="rounded-lg border border-border/50 bg-muted/10 px-3 py-2 text-sm">
+              <summary className="cursor-pointer select-none text-sm font-medium text-foreground/80">
+                AI Snapshot{request.aiModel ? ` (${request.aiModel})` : ''}
+              </summary>
+              <pre className="mt-2 max-h-56 overflow-auto rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
+                {request.aiResponseText}
+              </pre>
+            </details>
+          )}
         </CardContent>
       </Card>
 

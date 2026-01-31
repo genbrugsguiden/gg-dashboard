@@ -4,6 +4,7 @@ export type Role = 'ADMIN' | 'USER';
 export type RequestStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 export type FractionSource = 'AI_SUGGESTED' | 'KNOWN';
 export type MasterItemAction = 'NONE' | 'CREATE_NEW' | 'LINK_EXISTING';
+export type GoldenRequestStatus = 'DRAFT' | 'PUBLISHED';
 
 export interface User {
   id: string;
@@ -105,10 +106,13 @@ export interface RequestModel {
   imageURL: string;
   status: RequestStatus;
   isCurated: boolean;
+  goldenStatus?: GoldenRequestStatus;
   curatedAt?: string;
   curatedById?: string;
   curatedBy?: User;
   tokenQty?: number;
+  aiResponseText?: string;
+  aiModel?: string;
   requestedItems?: RequestedItemModel[];
   createdAt: string;
   updatedAt: string;
@@ -142,6 +146,34 @@ export interface AliasSuggestionsModel {
   conflicts: AliasConflict[];
 }
 
+export interface GoldenRequestedItemModel {
+  id: string;
+  goldenRequestId: string;
+  name: string;
+  aliases: string[];
+  notes?: string;
+  isActive: boolean;
+  fractionId: number;
+  fraction?: FractionModel;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GoldenRequestModel {
+  id: string;
+  title?: string;
+  notes?: string;
+  isActive: boolean;
+  status: GoldenRequestStatus;
+  organizationId?: string;
+  stationId?: string;
+  sourceRequestId?: string;
+  createdById?: string;
+  items: GoldenRequestedItemModel[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Input types
 export interface LoginInput {
   email: string;
@@ -172,4 +204,22 @@ export interface CurateRequestInput {
 export interface AddRequestedItemInput {
   requestId: string;
   detectedName: string;
+}
+
+export interface GoldenItemAliasesInput {
+  requestedItemId: string;
+  aliases: string[];
+}
+
+export interface CreateGoldenFromRequestInput {
+  requestId: string;
+  title?: string;
+  notes?: string;
+  itemAliases?: GoldenItemAliasesInput[];
+}
+
+export interface PublishGoldenFromRequestInput {
+  requestId: string;
+  title?: string;
+  notes?: string;
 }

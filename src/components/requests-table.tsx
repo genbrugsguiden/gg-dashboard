@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { ChevronRight, CheckCircle2, Circle, Loader2, ImageIcon } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Circle, Loader2, ImageIcon, Sparkles } from 'lucide-react';
 import type {
   PaginatedRequests,
   RequestModel,
@@ -113,19 +113,29 @@ export function RequestsTable() {
   };
 
   const getStatusBadge = (request: RequestModel) => {
-    if (request.isCurated) {
-      return (
-        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
-          <CheckCircle2 className="mr-1.5 h-3 w-3" />
-          Curated
-        </Badge>
-      );
-    }
     return (
-      <Badge variant="secondary" className="bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-        <Circle className="mr-1.5 h-3 w-3" />
-        Pending
-      </Badge>
+      <div className="flex flex-col gap-1.5">
+        {request.goldenStatus === 'PUBLISHED' && (
+          <Badge className="bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-800">
+            <Sparkles className="mr-1.5 h-3 w-3" />
+            Golden
+          </Badge>
+        )}
+        {request.isCurated ? (
+          <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
+            <CheckCircle2 className="mr-1.5 h-3 w-3" />
+            Curated
+          </Badge>
+        ) : (
+          <Badge
+            variant="secondary"
+            className="bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+          >
+            <Circle className="mr-1.5 h-3 w-3" />
+            Pending
+          </Badge>
+        )}
+      </div>
     );
   };
 
