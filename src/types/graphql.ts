@@ -5,6 +5,8 @@ export type RequestStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 export type FractionSource = 'AI_SUGGESTED' | 'KNOWN';
 export type MasterItemAction = 'NONE' | 'CREATE_NEW' | 'LINK_EXISTING';
 export type GoldenRequestStatus = 'DRAFT' | 'PUBLISHED';
+export type EvalRunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED';
+export type EvalMatchType = 'EXACT' | 'ALIAS' | 'NONE';
 
 export interface User {
   id: string;
@@ -154,6 +156,7 @@ export interface GoldenRequestedItemModel {
   notes?: string;
   isActive: boolean;
   fractionId: number;
+  masterItemId?: string;
   fraction?: FractionModel;
   createdAt: string;
   updatedAt: string;
@@ -174,6 +177,74 @@ export interface GoldenRequestModel {
   updatedAt: string;
 }
 
+export interface EvalPredictionModel {
+  id: string;
+  evalItemId: string;
+  name: string;
+  fractionId?: number;
+  matchedGoldenItemId?: string;
+  matchType: EvalMatchType;
+  fractionCorrect?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalTruthItemModel {
+  id: string;
+  evalItemId: string;
+  goldenItemId?: string;
+  name: string;
+  aliases: string[];
+  fractionId: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalItemModel {
+  id: string;
+  evalRunId: string;
+  goldenRequestId: string;
+  sourceRequestId?: string;
+  stationId?: string;
+  imageKey?: string;
+  model?: string;
+  tokenQty?: number;
+  durationMs?: number;
+  totalGoldenItems?: number;
+  totalPredictedItems?: number;
+  matchedItems?: number;
+  fractionCorrect?: number;
+  itemRecall?: number;
+  itemPrecision?: number;
+  fractionAccuracy?: number;
+  predictions?: EvalPredictionModel[];
+  truths?: EvalTruthItemModel[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvalRunModel {
+  id: string;
+  status: EvalRunStatus;
+  stationId?: string;
+  organizationId?: string;
+  model?: string;
+  promptVersion?: string;
+  createdAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  totalGoldenRequests?: number;
+  totalGoldenItems?: number;
+  totalPredictedItems?: number;
+  matchedItems?: number;
+  fractionCorrect?: number;
+  itemRecall?: number;
+  itemPrecision?: number;
+  fractionAccuracy?: number;
+  items?: EvalItemModel[];
+  updatedAt: string;
+}
+
 // Input types
 export interface LoginInput {
   email: string;
@@ -187,8 +258,23 @@ export interface RequestsFilterInput {
   createdAtTo?: string;
 }
 
+export interface EvalRunsFilterInput {
+  stationId?: string;
+  organizationId?: string;
+  status?: EvalRunStatus;
+}
+
+export interface RunGoldenEvalInput {
+  stationId?: string;
+  organizationId?: string;
+  goldenRequestIds?: string[];
+  limit?: number;
+  model?: string;
+  promptVersion?: string;
+}
+
 export interface CuratedItemInput {
-  requestedItemId: string;
+  goldenItemId: string;
   correctedFractionId: number;
   masterItemAction: MasterItemAction;
   masterItemId?: string;

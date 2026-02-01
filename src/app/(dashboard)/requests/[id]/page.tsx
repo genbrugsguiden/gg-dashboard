@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, use, useMemo, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { GET_REQUEST, GET_GOLDEN_BY_SOURCE } from '@/lib/graphql/queries';
 import {
   CURATE_REQUEST,
   ADD_REQUESTED_ITEM,
   DELETE_REQUESTED_ITEM,
+  CREATE_GOLDEN_FROM_REQUEST,
   PUBLISH_GOLDEN_FROM_REQUEST,
 } from '@/lib/graphql/mutations';
 import { RequestDetail } from '@/components/request-detail';
@@ -32,6 +33,7 @@ import type {
   CuratedItemInput,
   RequestedItemModel,
   GoldenRequestModel,
+  MasterItemAction,
 } from '@/types/graphql';
 
 interface PageProps {
@@ -41,6 +43,7 @@ interface PageProps {
 export default function RequestDetailPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [curatedItems, setCuratedItems] = useState<Map<string, Partial<CuratedItemInput>>>(
     new Map()
   );
@@ -72,11 +75,23 @@ export default function RequestDetailPage({ params }: PageProps) {
     fetchPolicy: 'cache-and-network',
   });
 
+  const [createGoldenFromRequest, { loading: creatingDraft }] = useMutation<{
+    createGoldenFromRequest: GoldenRequestModel;
+  }>(CREATE_GOLDEN_FROM_REQUEST, {
+    onCompleted: () => {
+      refetchGolden();
+      setViewMode('curated');
+      setIsCurating(true);
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create golden draft');
+    },
+  });
+
 
   const [curateRequest, { loading: saving }] = useMutation(CURATE_REQUEST, {
     onCompleted: () => {
       toast.success('Curation saved successfully');
-      refetch();
       refetchGolden();
       setDirtyItems(new Set());
       setPendingDeleteIds(new Set());
@@ -89,17 +104,17 @@ export default function RequestDetailPage({ params }: PageProps) {
   });
 
   const [addRequestedItem, { loading: addingItem }] = useMutation<{
-    addRequestedItem: RequestedItemModel;
+    addRequestedItem: GoldenRequestModel['items'][number];
   }>(ADD_REQUESTED_ITEM, {
     onCompleted: (data) => {
-      toast.success(`Added "${data.addRequestedItem.detectedName}"`);
+      toast.success(`Added "${data.addRequestedItem.name}"`);
       setAddItemDialogOpen(false);
       setNewItemName('');
       // Track this item as manually added
       setManuallyAddedItems((prev) => new Set(prev).add(data.addRequestedItem.id));
       // Auto-expand the newly added item
       setExpandedItems((prev) => new Set(prev).add(data.addRequestedItem.id));
-      refetch();
+      refetchGolden();
     },
     onError: (error) => {
       toast.error(error.message || 'Failed to add item');
@@ -216,23 +231,18 @@ export default function RequestDetailPage({ params }: PageProps) {
   const handleSaveCuration = async () => {
     const items = Array.from(curatedItems.values()).filter(
       (item): item is CuratedItemInput =>
-        item.requestedItemId !== undefined &&
+        item.goldenItemId !== undefined &&
         item.correctedFractionId !== undefined &&
-        !pendingDeleteIds.has(item.requestedItemId)
+        !pendingDeleteIds.has(item.goldenItemId)
     );
 
     let itemsToSave = items;
     if (itemsToSave.length === 0 && pendingDeleteIds.size === 0) {
-      if (request.isCurated) {
-        toast.error('Please make at least one change before saving');
-        return;
-      }
-
-      const inferred = visibleItems
+      const inferred = visibleGoldenItems
         .map((item) => ({
-          requestedItemId: item.id,
-          correctedFractionId:
-            item.userFractionId ?? item.suggestedFractions?.[0]?.fractionId,
+          goldenItemId: item.id,
+          correctedFractionId: item.fractionId,
+          masterItemAction: MasterItemAction.NONE,
         }))
         .filter(
           (item): item is CuratedItemInput =>
@@ -285,27 +295,33 @@ export default function RequestDetailPage({ params }: PageProps) {
     setNewItemName('');
   };
 
-  useEffect(() => {
-    if (viewMode !== 'ai' && isCurating) {
-      setIsCurating(false);
-    }
-  }, [viewMode, isCurating]);
-
   const hasInitializedView = useRef(false);
   useEffect(() => {
-    if (hasInitializedView.current) return;
-    if (goldenData?.goldenRequestBySource && viewMode === 'ai') {
-      setViewMode('curated');
+    let timeoutId: number | undefined;
+    const viewParam = searchParams.get('view');
+    if (viewParam === 'golden' || viewParam === 'curated') {
+      timeoutId = window.setTimeout(() => setViewMode('curated'), 0);
+      return () => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      };
     }
+    if (viewParam === 'ai') {
+      timeoutId = window.setTimeout(() => setViewMode('ai'), 0);
+      return () => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      };
+    }
+    if (hasInitializedView.current) return;
     hasInitializedView.current = true;
-  }, [goldenData?.goldenRequestBySource, viewMode]);
+    if (goldenData?.goldenRequestBySource && viewMode === 'ai') {
+      timeoutId = window.setTimeout(() => setViewMode('curated'), 0);
+    }
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    };
+  }, [goldenData?.goldenRequestBySource, searchParams, viewMode]);
 
   const handleCreateGolden = () => {
-    if (!request.isCurated) {
-      toast.error('Request must be curated before creating golden data');
-      return;
-    }
-
     const data: {
       requestId: string;
       title?: string;
@@ -354,7 +370,13 @@ export default function RequestDetailPage({ params }: PageProps) {
   const request = data.request;
   const items = request.requestedItems || [];
   const visibleItems = items.filter((item) => !pendingDeleteIds.has(item.id));
-  const hasGolden = Boolean(goldenData?.goldenRequestBySource?.items?.length);
+  const goldenRequest = goldenData?.goldenRequestBySource;
+  const goldenItems = goldenRequest?.items ?? [];
+  const visibleGoldenItems = goldenItems.filter(
+    (item) => !pendingDeleteIds.has(item.id),
+  );
+  const hasGolden = Boolean(goldenRequest);
+  const isGoldenPublished = goldenRequest?.status === 'PUBLISHED';
   const isEmptyState =
     viewMode === 'curated' ? !hasGolden : visibleItems.length === 0;
 
@@ -375,13 +397,13 @@ export default function RequestDetailPage({ params }: PageProps) {
         </Button>
 
         <div className="flex items-center gap-3">
-          {!request.isCurated && dirtyItems.size > 0 && viewMode === 'ai' && isCurating && (
+          {dirtyItems.size > 0 && viewMode === 'curated' && isCurating && (
             <div className="flex items-center gap-2 rounded-full bg-warning/10 px-3 py-1.5 text-sm font-medium text-warning">
               <AlertTriangle className="h-4 w-4" />
               Draft Changes
             </div>
           )}
-          {viewMode === 'ai' && dirtyItems.size > 0 && isCurating && (
+          {viewMode === 'curated' && dirtyItems.size > 0 && isCurating && (
             <Button
               type="button"
               variant="ghost"
@@ -392,7 +414,7 @@ export default function RequestDetailPage({ params }: PageProps) {
               Reset Draft
             </Button>
           )}
-          {viewMode === 'ai' && isCurating && (
+          {viewMode === 'curated' && isCurating && (
             <Button
               onClick={handleSaveCuration}
               disabled={saving}
@@ -406,9 +428,9 @@ export default function RequestDetailPage({ params }: PageProps) {
               Save Curation
             </Button>
           )}
-          {viewMode === 'curated' && (
+          {viewMode === 'curated' && hasGolden && !isCurating && dirtyItems.size === 0 && (
             <>
-              {request.isCurated && (
+              {goldenRequest?.status === 'DRAFT' && (
                 <Dialog open={goldenDialogOpen} onOpenChange={setGoldenDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline" className="gap-2">
@@ -470,7 +492,6 @@ export default function RequestDetailPage({ params }: PageProps) {
               variant="outline"
               size="sm"
               onClick={() => {
-                setViewMode('ai');
                 setIsCurating(true);
               }}
             >
@@ -480,18 +501,31 @@ export default function RequestDetailPage({ params }: PageProps) {
           )}
           {viewMode === 'ai' &&
             (!isCurating ? (
-              request.isCurated ? (
+              isGoldenPublished ? (
                 <div className="flex items-center gap-2 rounded-full bg-success/10 px-3 py-1.5 text-sm font-medium text-success badge-glow-success">
                   <CheckCircle2 className="h-4 w-4" />
-                  Already Curated
+                  Golden Published
                 </div>
               ) : (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsCurating(true)}
+                  disabled={creatingDraft}
+                  onClick={() => {
+                    if (hasGolden) {
+                      setViewMode('curated');
+                      setIsCurating(true);
+                      return;
+                    }
+                    createGoldenFromRequest({
+                      variables: { data: { requestId: request.id } },
+                    });
+                  }}
                 >
+                  {creatingDraft ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
                   Curate
                 </Button>
               )
@@ -503,7 +537,10 @@ export default function RequestDetailPage({ params }: PageProps) {
               variant={viewMode === 'curated' ? 'default' : 'ghost'}
               className={`h-8 px-3 ${!hasGolden ? 'opacity-50' : ''}`}
               onClick={() => {
-                if (hasGolden) setViewMode('curated');
+                if (hasGolden) {
+                  setViewMode('curated');
+                  setIsCurating(false);
+                }
               }}
             >
               Golden
@@ -513,7 +550,10 @@ export default function RequestDetailPage({ params }: PageProps) {
               size="sm"
               variant={viewMode === 'ai' ? 'default' : 'ghost'}
               className="h-8 px-3"
-              onClick={() => setViewMode('ai')}
+              onClick={() => {
+                setViewMode('ai');
+                setIsCurating(false);
+              }}
             >
               AI
             </Button>
@@ -548,7 +588,7 @@ export default function RequestDetailPage({ params }: PageProps) {
             </div>
 
             {/* Add Item Button */}
-            {viewMode === 'ai' && isCurating && (
+            {viewMode === 'curated' && isCurating && (
               <Dialog open={addItemDialogOpen} onOpenChange={setAddItemDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
@@ -560,7 +600,7 @@ export default function RequestDetailPage({ params }: PageProps) {
                   <DialogHeader>
                     <DialogTitle>Add Item</DialogTitle>
                     <DialogDescription>
-                      Add an item that the AI missed detecting in the image.
+                      Add an item to the golden draft for this request.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -619,10 +659,10 @@ export default function RequestDetailPage({ params }: PageProps) {
               </p>
               {viewMode === 'curated' && (
                 <div className="mt-4 text-xs text-muted-foreground">
-                  Publish a golden request to view curated ground truth here.
+                  Create a golden draft to start curation.
                 </div>
               )}
-              {viewMode === 'ai' && isCurating && (
+              {viewMode === 'curated' && isCurating && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -636,8 +676,44 @@ export default function RequestDetailPage({ params }: PageProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              {viewMode === 'curated'
-                ? goldenData?.goldenRequestBySource?.items?.map((item, index) => (
+              {viewMode === 'curated' ? (
+                isCurating ? (
+                  visibleGoldenItems.map((item, index) => (
+                    <div
+                      key={item.id}
+                      className={`animate-fade-in-up opacity-0 stagger-${Math.min(index + 2, 5)}`}
+                    >
+                      <ItemEditor
+                        item={{
+                          id: item.id,
+                          detectedName: item.name,
+                          confidence: null,
+                          itemId: item.masterItemId ?? null,
+                          item: item.masterItemId
+                            ? { id: item.masterItemId, name: item.name, aliases: item.aliases ?? [] }
+                            : null,
+                          userFractionId: item.fractionId,
+                          suggestedFractions: [],
+                          isCurated: true,
+                        }}
+                        availableFractions={availableFractions}
+                        organizationId={organizationId}
+                        onChange={(changes) => handleItemChange(item.id, changes)}
+                        onDirty={handleItemDirty}
+                        isExpanded={expandedItems.has(item.id)}
+                        onToggleExpand={() => handleToggleExpand(item.id)}
+                        onDelete={() =>
+                          handleDeleteClick({
+                            id: item.id,
+                            detectedName: item.name,
+                          } as RequestedItemModel)
+                        }
+                        isManuallyAdded={manuallyAddedItems.has(item.id)}
+                      />
+                    </div>
+                  ))
+                ) : (
+                  visibleGoldenItems.map((item, index) => (
                     <div
                       key={item.id}
                       className={`animate-fade-in-up opacity-0 stagger-${Math.min(index + 2, 5)}`}
@@ -669,29 +745,9 @@ export default function RequestDetailPage({ params }: PageProps) {
                       </div>
                     </div>
                   ))
-                : isCurating
-                  ? visibleItems.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className={`animate-fade-in-up opacity-0 stagger-${Math.min(index + 2, 5)}`}
-                      >
-                        <ItemEditor
-                          item={item}
-                          availableFractions={availableFractions}
-                          organizationId={organizationId}
-                          onChange={(changes) => handleItemChange(item.id, changes)}
-                          onDirty={handleItemDirty}
-                          isExpanded={expandedItems.has(item.id)}
-                          onToggleExpand={() => handleToggleExpand(item.id)}
-                          onDelete={() => handleDeleteClick(item)}
-                          isManuallyAdded={
-                            manuallyAddedItems.has(item.id) ||
-                            !item.suggestedFractions?.length
-                          }
-                        />
-                      </div>
-                    ))
-                  : visibleItems.map((item, index) => {
+                )
+              ) : (
+                visibleItems.map((item, index) => {
                       const itemFraction = item.userFractionId
                         ? availableFractions.find((sf) => sf.fractionId === item.userFractionId)
                             ?.fraction
@@ -728,7 +784,8 @@ export default function RequestDetailPage({ params }: PageProps) {
                           </div>
                         </div>
                       );
-                    })}
+                    })
+              )}
             </div>
           )}
           </div>

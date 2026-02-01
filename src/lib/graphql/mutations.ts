@@ -20,11 +20,15 @@ export const CURATE_REQUEST = gql`
   mutation CurateRequest($data: CurateRequestInput!) {
     curateRequest(data: $data) {
       id
-      isCurated
-      curatedAt
-      curatedBy {
+      status
+      sourceRequestId
+      items {
         id
-        email
+        name
+        aliases
+        fractionId
+        masterItemId
+        isActive
       }
     }
   }
@@ -44,9 +48,11 @@ export const ADD_REQUESTED_ITEM = gql`
   mutation AddRequestedItem($data: AddRequestedItemInput!) {
     addRequestedItem(data: $data) {
       id
-      detectedName
-      confidence
-      isCurated
+      name
+      aliases
+      fractionId
+      masterItemId
+      isActive
     }
   }
 `;
@@ -97,6 +103,25 @@ export const PUBLISH_GOLDEN_FROM_REQUEST = gql`
         isActive
         fractionId
       }
+    }
+  }
+`;
+
+export const RUN_GOLDEN_EVAL = gql`
+  mutation RunGoldenEval($data: RunGoldenEvalInput!) {
+    runGoldenEval(data: $data) {
+      id
+      status
+      totalGoldenRequests
+      totalGoldenItems
+      totalPredictedItems
+      matchedItems
+      fractionCorrect
+      itemRecall
+      itemPrecision
+      fractionAccuracy
+      createdAt
+      completedAt
     }
   }
 `;

@@ -3,9 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useQuery, useMutation } from '@apollo/client/react';
+import { useQuery } from '@apollo/client/react';
 import { GET_REQUESTS } from '@/lib/graphql/queries';
-import { MARK_REQUEST_CURATED } from '@/lib/graphql/mutations';
 import {
   Table,
   TableBody,
@@ -14,8 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
@@ -25,8 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from 'sonner';
-import { ChevronRight, CheckCircle2, Circle, Loader2, ImageIcon, Sparkles } from 'lucide-react';
+import { ChevronRight, CheckCircle2, Circle, ImageIcon, Loader2, Sparkles } from 'lucide-react';
 import type {
   PaginatedRequests,
   RequestModel,
@@ -35,11 +31,10 @@ import type {
 
 export function RequestsTable() {
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<RequestsFilterInput>({});
-  const [curatedFilter, setCuratedFilter] = useState<string>('all');
+  const [goldenFilter, setGoldenFilter] = useState<string>('all');
 
-  const { data, loading, error, refetch } = useQuery<{
+  const { data, loading, error } = useQuery<{
     requests: PaginatedRequests;
   }>(GET_REQUESTS, {
     variables: {
@@ -48,58 +43,26 @@ export function RequestsTable() {
     notifyOnNetworkStatusChange: true,
   });
 
-  const [markCurated, { loading: markingCurated }] = useMutation(
-    MARK_REQUEST_CURATED,
-    {
-      onCompleted: () => {
-        toast.success('Request marked as curated');
-        setSelectedIds(new Set());
-        refetch();
-      },
-      onError: (error) => {
-        toast.error(error.message || 'Failed to mark as curated');
-      },
-    }
-  );
-
   const requests = data?.requests.edges?.map((e) => e.node) || [];
   const totalCount = data?.requests.totalCount || 0;
+  const filteredRequests =
+    goldenFilter === 'all'
+      ? requests
+      : requests.filter((request) => {
+          if (goldenFilter === 'draft') {
+            return request.goldenStatus === 'DRAFT';
+          }
+          if (goldenFilter === 'published') {
+            return request.goldenStatus === 'PUBLISHED';
+          }
+          if (goldenFilter === 'pending') {
+            return !request.goldenStatus;
+          }
+          return true;
+        });
 
-  const handleCuratedFilterChange = (value: string) => {
-    setCuratedFilter(value);
-    const newFilters = { ...filters };
-    if (value === 'curated') {
-      newFilters.isCurated = true;
-    } else if (value === 'pending') {
-      newFilters.isCurated = false;
-    } else {
-      delete newFilters.isCurated;
-    }
-    setFilters(newFilters);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedIds(new Set(requests.map((r) => r.id)));
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
-  const handleSelectOne = (id: string, checked: boolean) => {
-    const newSelected = new Set(selectedIds);
-    if (checked) {
-      newSelected.add(id);
-    } else {
-      newSelected.delete(id);
-    }
-    setSelectedIds(newSelected);
-  };
-
-  const handleBulkMarkCurated = async () => {
-    for (const id of selectedIds) {
-      await markCurated({ variables: { requestId: id } });
-    }
+  const handleGoldenFilterChange = (value: string) => {
+    setGoldenFilter(value);
   };
 
   const formatDate = (dateString: string) => {
@@ -121,12 +84,12 @@ export function RequestsTable() {
             Golden
           </Badge>
         )}
-        {request.isCurated ? (
+        {request.goldenStatus === 'DRAFT' ? (
           <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800">
             <CheckCircle2 className="mr-1.5 h-3 w-3" />
-            Curated
+            Draft
           </Badge>
-        ) : (
+        ) : request.goldenStatus !== 'PUBLISHED' ? (
           <Badge
             variant="secondary"
             className="bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
@@ -134,7 +97,7 @@ export function RequestsTable() {
             <Circle className="mr-1.5 h-3 w-3" />
             Pending
           </Badge>
-        )}
+        ) : null}
       </div>
     );
   };
@@ -147,21 +110,19 @@ export function RequestsTable() {
     );
   }
 
-  const allSelected = requests.length > 0 && selectedIds.size === requests.length;
-  const someSelected = selectedIds.size > 0 && selectedIds.size < requests.length;
-
   return (
     <div className="space-y-6">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={curatedFilter} onValueChange={handleCuratedFilterChange}>
+        <Select value={goldenFilter} onValueChange={handleGoldenFilterChange}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Filter status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All requests</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="curated">Curated</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="published">Golden</SelectItem>
           </SelectContent>
         </Select>
 
@@ -188,21 +149,6 @@ export function RequestsTable() {
           }
         />
 
-        {selectedIds.size > 0 && (
-          <Button
-            variant="outline"
-            onClick={handleBulkMarkCurated}
-            disabled={markingCurated}
-          >
-            {markingCurated ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            Mark {selectedIds.size} as Curated
-          </Button>
-        )}
-
         <span className="ml-auto text-sm font-medium text-zinc-500 dark:text-zinc-400">
           {totalCount} requests
         </span>
@@ -213,12 +159,6 @@ export function RequestsTable() {
         <Table>
           <TableHeader>
             <TableRow className="border-zinc-200 dark:border-zinc-800">
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={someSelected ? 'indeterminate' : allSelected}
-                  onCheckedChange={handleSelectAll}
-                />
-              </TableHead>
               <TableHead className="w-16">Preview</TableHead>
               <TableHead>Detected Items</TableHead>
               <TableHead className="w-40">Date</TableHead>
@@ -227,36 +167,28 @@ export function RequestsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading && requests.length === 0 ? (
+            {loading && filteredRequests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center">
+                <TableCell colSpan={5} className="h-32 text-center">
                   <Loader2 className="mx-auto h-6 w-6 animate-spin text-zinc-400" />
                 </TableCell>
               </TableRow>
-            ) : requests.length === 0 ? (
+            ) : filteredRequests.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={5}
                   className="h-32 text-center text-zinc-500"
                 >
                   No requests found
                 </TableCell>
               </TableRow>
             ) : (
-              requests.map((request) => (
+              filteredRequests.map((request) => (
                 <TableRow
                   key={request.id}
                   className="cursor-pointer border-zinc-100 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/50"
                   onClick={() => router.push(`/requests/${request.id}`)}
                 >
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedIds.has(request.id)}
-                      onCheckedChange={(checked) =>
-                        handleSelectOne(request.id, !!checked)
-                      }
-                    />
-                  </TableCell>
                   <TableCell>
                     <div className="relative h-12 w-12 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800">
                       {request.imageURL ? (
