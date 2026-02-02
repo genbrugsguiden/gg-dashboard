@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLazyQuery } from '@apollo/client/react';
-import { SUGGEST_ALIASES } from '@/lib/graphql/queries';
+import { GET_MASTER_ITEMS, SUGGEST_ALIASES } from '@/lib/graphql/queries';
 import { CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -92,13 +92,17 @@ export function ItemEditor({
   const [suggestAliases, { data: aliasData, loading: aliasLoading }] = useLazyQuery<{
     suggestAliases: AliasSuggestionsModel;
   }>(SUGGEST_ALIASES);
+  const [fetchMasterItems, { data: masterItemsData, loading: masterItemsLoading }] =
+    useLazyQuery<{ masterItems: MasterItemModel[] }>(GET_MASTER_ITEMS, {
+      fetchPolicy: 'cache-and-network',
+    });
 
   // On mount, if we're defaulting to CREATE_NEW for an unknown item,
   // emit the initial state so parent form captures it
   useEffect(() => {
     if (!initialValues && !item.itemId && selectedFractionId) {
       onChange({
-        requestedItemId: item.id,
+        goldenItemId: item.id,
         correctedFractionId: selectedFractionId,
         masterItemAction: 'CREATE_NEW',
         newMasterItemName: item.detectedName,
@@ -107,6 +111,21 @@ export function ItemEditor({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
+
+  useEffect(() => {
+    if (masterItemAction !== 'CREATE_NEW') return;
+    const trimmed = newMasterItemName.trim();
+    if (!trimmed) return;
+    const timeoutId = window.setTimeout(() => {
+      fetchMasterItems({
+        variables: {
+          organizationId,
+          query: trimmed,
+        },
+      });
+    }, 200);
+    return () => window.clearTimeout(timeoutId);
+  }, [masterItemAction, newMasterItemName, organizationId, fetchMasterItems]);
 
   // Helper to emit changes - called on user interactions only
   const emitChanges = (updates: {
@@ -125,7 +144,7 @@ export function ItemEditor({
     if (fractionId === undefined) return;
 
     onChange({
-      requestedItemId: item.id,
+      goldenItemId: item.id,
       correctedFractionId: fractionId,
       masterItemAction: action,
       masterItemId: action === 'LINK_EXISTING' ? masterId : undefined,
@@ -212,6 +231,17 @@ export function ItemEditor({
   );
 
   const aliasSuggestions = aliasData?.suggestAliases;
+  const duplicateMasterItem = (() => {
+    if (masterItemAction !== 'CREATE_NEW') return undefined;
+    const candidates = masterItemsData?.masterItems ?? [];
+    const normalized = normalizeName(newMasterItemName);
+    if (!normalized) return undefined;
+    return candidates.find(
+      (candidate) =>
+        normalizeName(candidate.name) === normalized ||
+        candidate.aliases.some((alias) => normalizeName(alias) === normalized),
+    );
+  })();
 
   // Handle header click to toggle expansion
   const handleHeaderClick = () => {
@@ -260,9 +290,11 @@ export function ItemEditor({
                 />
               )}
               <span className="truncate max-w-[120px]">{selectedFraction.fraction.name}</span>
-              <span className="text-muted-foreground/70 hidden sm:inline">
-                ({selectedFraction.fraction.category?.name})
-              </span>
+              {selectedFraction.fraction.category?.name ? (
+                <span className="text-muted-foreground/70 hidden sm:inline">
+                  ({selectedFraction.fraction.category.name})
+                </span>
+              ) : null}
             </>
           ) : (
             <span className="italic">No fraction</span>
@@ -339,9 +371,11 @@ export function ItemEditor({
                         />
                       )}
                       <span className="font-medium">{sf.fraction.name}</span>
-                      <span className="text-muted-foreground">
-                        ({sf.fraction.category?.name})
-                      </span>
+                      {sf.fraction.category?.name && (
+                        <span className="text-muted-foreground">
+                          ({sf.fraction.category.name})
+                        </span>
+                      )}
                     </div>
                   </SelectItem>
                 ))}
@@ -419,6 +453,36 @@ export function ItemEditor({
                 placeholder={item.detectedName}
                 className="h-11"
               />
+              {masterItemsLoading && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Checking for existing items...
+                </div>
+              )}
+              {duplicateMasterItem && (
+                <div className="flex items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <span>
+                    Existing MasterItem found: <strong>{duplicateMasterItem.name}</strong>
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => {
+                      setMasterItemAction('LINK_EXISTING');
+                      setSelectedMasterItemId(duplicateMasterItem.id);
+                      emitChanges({
+                        action: 'LINK_EXISTING',
+                        masterId: duplicateMasterItem.id,
+                      });
+                      onDirty?.(item.id);
+                    }}
+                  >
+                    Use existing
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -540,4 +604,8 @@ export function ItemEditor({
       )}
     </div>
   );
+}
+
+function normalizeName(value: string): string {
+  return value.toLowerCase().trim().replace(/\s+/g, ' ');
 }

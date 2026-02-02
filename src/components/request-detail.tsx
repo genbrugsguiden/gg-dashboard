@@ -56,17 +56,17 @@ export function RequestDetail({ request }: RequestDetailProps) {
                 Golden
               </Badge>
             )}
-            {request.isCurated ? (
-              <Badge className="bg-success text-success-foreground shadow-sm badge-glow-success">
-                <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                Curated
+            {request.goldenStatus === 'DRAFT' ? (
+              <Badge variant="secondary" className="shadow-sm">
+                <Clock className="mr-1.5 h-3.5 w-3.5" />
+                Draft Curation
               </Badge>
-            ) : (
+            ) : request.goldenStatus !== 'PUBLISHED' ? (
               <Badge variant="secondary" className="shadow-sm">
                 <Clock className="mr-1.5 h-3.5 w-3.5" />
                 Pending Curation
               </Badge>
-            )}
+            ) : null}
           </div>
         </div>
         <CardContent className="space-y-4 pt-4 pb-5">

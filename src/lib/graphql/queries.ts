@@ -14,6 +14,85 @@ export const GET_ME = gql`
   }
 `;
 
+export const GET_EVAL_RUNS = gql`
+  query EvalRuns($filter: EvalRunsFilterInput) {
+    evalRuns(filter: $filter) {
+      id
+      status
+      stationId
+      organizationId
+      model
+      promptVersion
+      createdAt
+      completedAt
+      totalGoldenRequests
+      totalGoldenItems
+      totalPredictedItems
+      matchedItems
+      fractionCorrect
+      itemRecall
+      itemPrecision
+      fractionAccuracy
+    }
+  }
+`;
+
+export const GET_EVAL_RUN = gql`
+  query EvalRun($id: ID!) {
+    evalRun(id: $id) {
+      id
+      status
+      stationId
+      organizationId
+      model
+      promptVersion
+      createdAt
+      completedAt
+      durationMs
+      totalGoldenRequests
+      totalGoldenItems
+      totalPredictedItems
+      matchedItems
+      fractionCorrect
+      itemRecall
+      itemPrecision
+      fractionAccuracy
+      items {
+        id
+        goldenRequestId
+        sourceRequestId
+        stationId
+        imageKey
+        model
+        tokenQty
+        durationMs
+        totalGoldenItems
+        totalPredictedItems
+        matchedItems
+        fractionCorrect
+        itemRecall
+        itemPrecision
+        fractionAccuracy
+        predictions {
+          id
+          name
+          fractionId
+          matchType
+          fractionCorrect
+          matchedGoldenItemId
+        }
+        truths {
+          id
+          name
+          aliases
+          fractionId
+          goldenItemId
+        }
+      }
+    }
+  }
+`;
+
 export const GET_REQUESTS = gql`
   query GetRequests($filter: RequestsFilterInput) {
     requests(filter: $filter) {
@@ -126,7 +205,9 @@ export const GET_GOLDEN_BY_SOURCE = gql`
       items {
         id
         name
+        aliases
         fractionId
+        masterItemId
         fraction {
           id
           name

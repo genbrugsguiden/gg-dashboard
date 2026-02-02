@@ -12,7 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User as UserIcon, ChevronDown, Leaf } from 'lucide-react';
+import { LogOut, User as UserIcon, ChevronDown, Leaf, BarChart3 } from 'lucide-react';
+import Link from 'next/link';
 import type { User } from '@/types/graphql';
 
 // Hydration-safe mounted detection using useSyncExternalStore
@@ -79,6 +80,22 @@ export default function DashboardLayout({
               <span className="text-xs text-muted-foreground">Curation Dashboard</span>
             </div>
           </div>
+
+          <nav className="hidden items-center gap-2 md:flex">
+            <Link
+              href="/requests"
+              className="rounded-full border border-border/60 px-4 py-1.5 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+            >
+              Requests
+            </Link>
+            <Link
+              href="/evals"
+              className="inline-flex items-center gap-2 rounded-full border border-border/60 px-4 py-1.5 text-sm text-muted-foreground transition hover:border-border hover:text-foreground"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Evals
+            </Link>
+          </nav>
 
           {/* User Menu */}
           <DropdownMenu>
