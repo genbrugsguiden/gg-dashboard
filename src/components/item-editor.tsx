@@ -51,6 +51,7 @@ interface ItemEditorProps {
   onToggleExpand?: () => void;
   onDelete?: () => void;
   isManuallyAdded?: boolean;
+  onDirty?: (itemId: string) => void;
 }
 
 export function ItemEditor({
@@ -63,6 +64,7 @@ export function ItemEditor({
   onToggleExpand,
   onDelete,
   isManuallyAdded = false,
+  onDirty,
 }: ItemEditorProps) {
   // Derive initial fraction from item's first suggested fraction or userFractionId
   const defaultFractionId =
@@ -136,6 +138,7 @@ export function ItemEditor({
     const fractionId = parseInt(value, 10);
     setSelectedFractionId(fractionId);
     emitChanges({ fractionId });
+    onDirty?.(item.id);
   };
 
   const handleMasterItemActionChange = (value: string) => {
@@ -147,6 +150,7 @@ export function ItemEditor({
       setAliases([]);
     }
     emitChanges({ action });
+    onDirty?.(item.id);
   };
 
   const handleMasterItemIdChange = (
@@ -162,11 +166,13 @@ export function ItemEditor({
     } else {
       emitChanges({ masterId: itemId });
     }
+    onDirty?.(item.id);
   };
 
   const handleNewMasterItemNameChange = (value: string) => {
     setNewMasterItemName(value);
     emitChanges({ newName: value });
+    onDirty?.(item.id);
   };
 
   const handleSuggestAliases = () => {
@@ -184,6 +190,7 @@ export function ItemEditor({
       const newAliases = [...aliases, trimmed];
       setAliases(newAliases);
       emitChanges({ newAliases });
+      onDirty?.(item.id);
     }
     setAliasInput('');
   };
@@ -192,6 +199,7 @@ export function ItemEditor({
     const newAliases = aliases.filter((a) => a !== alias);
     setAliases(newAliases);
     emitChanges({ newAliases });
+    onDirty?.(item.id);
   };
 
   // Get source info from first suggested fraction

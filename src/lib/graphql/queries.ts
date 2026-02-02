@@ -24,6 +24,7 @@ export const GET_REQUESTS = gql`
           imageURL
           status
           isCurated
+          goldenStatus
           curatedAt
           createdAt
           requestedItems {
@@ -48,7 +49,10 @@ export const GET_REQUEST = gql`
       imageURL
       status
       isCurated
+      goldenStatus
       curatedAt
+      aiResponseText
+      aiModel
       stationId
       station {
         id
@@ -106,6 +110,30 @@ export const GET_REQUEST = gql`
                 color
               }
             }
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const GET_GOLDEN_BY_SOURCE = gql`
+  query GetGoldenBySource($data: GoldenRequestBySourceInput!) {
+    goldenRequestBySource(data: $data) {
+      id
+      status
+      sourceRequestId
+      items {
+        id
+        name
+        fractionId
+        fraction {
+          id
+          name
+          category {
+            id
+            name
+            color
           }
         }
       }
