@@ -71,7 +71,9 @@ export default function RequestDetailPage({ params }: PageProps) {
   const { data, loading, error, refetch } = useQuery<{ request: RequestModel }>(GET_REQUEST, {
     variables: { id: resolvedParams.id },
   });
-  const { data: goldenData, refetch: refetchGolden } = useQuery(GET_GOLDEN_BY_SOURCE, {
+  const { data: goldenData, refetch: refetchGolden } = useQuery<{
+    goldenRequestBySource: GoldenRequestModel | null;
+  }>(GET_GOLDEN_BY_SOURCE, {
     variables: { data: { sourceRequestId: resolvedParams.id } },
     fetchPolicy: 'cache-and-network',
   });
@@ -243,12 +245,8 @@ export default function RequestDetailPage({ params }: PageProps) {
         .map((item: GoldenRequestedItemModel) => ({
           goldenItemId: item.id,
           correctedFractionId: item.fractionId,
-          masterItemAction: MasterItemAction.NONE,
-        }))
-        .filter(
-          (item): item is CuratedItemInput =>
-            item.correctedFractionId !== undefined,
-        );
+          masterItemAction: 'NONE',
+        })) as CuratedItemInput[];
 
       if (inferred.length === 0) {
         toast.error('No fractions available to save');
@@ -687,15 +685,24 @@ export default function RequestDetailPage({ params }: PageProps) {
                       <ItemEditor
                         item={{
                           id: item.id,
+                          requestId: request.id,
                           detectedName: item.name,
-                          confidence: null,
-                          itemId: item.masterItemId ?? null,
+                          confidence: undefined,
+                          itemId: item.masterItemId ?? undefined,
                           item: item.masterItemId
-                            ? { id: item.masterItemId, name: item.name, aliases: item.aliases ?? [] }
-                            : null,
+                            ? {
+                                id: item.masterItemId,
+                                name: item.name,
+                                aliases: item.aliases ?? [],
+                                createdAt: request.createdAt,
+                                updatedAt: request.updatedAt,
+                              }
+                            : undefined,
                           userFractionId: item.fractionId,
                           suggestedFractions: [],
                           isCurated: true,
+                          createdAt: request.createdAt,
+                          updatedAt: request.updatedAt,
                         }}
                         availableFractions={availableFractions}
                         organizationId={organizationId}

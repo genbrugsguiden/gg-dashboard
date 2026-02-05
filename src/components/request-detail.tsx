@@ -1,4 +1,4 @@
-'use client';
+ git merge main -s recursive -X ours'use client';
 
 import { useState } from 'react';
 import Image from 'next/image';

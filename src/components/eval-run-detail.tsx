@@ -8,7 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
-import type { EvalItemModel, EvalRunModel, RequestModel } from '@/types/graphql';
+import type {
+  EvalItemModel,
+  EvalRunModel,
+  RequestModel,
+  EvalPredictionModel,
+} from '@/types/graphql';
 
 interface EvalRunDetailProps {
   runId?: string;
@@ -300,7 +305,9 @@ function formatDuration(value?: number | null) {
   return `${Math.round(value)} ms`;
 }
 
-function getPredictionStyle(pred: EvalItemModel['predictions'][number]) {
+function getPredictionStyle(
+  pred: EvalPredictionModel | undefined,
+) {
   if (!pred) return 'border-border/40 bg-background/60';
   if (pred.matchType === 'NONE') {
     return 'border-destructive/30 bg-destructive/10 text-destructive';
