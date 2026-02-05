@@ -33,6 +33,7 @@ import type {
   CuratedItemInput,
   RequestedItemModel,
   GoldenRequestModel,
+  GoldenRequestedItemModel,
   MasterItemAction,
 } from '@/types/graphql';
 
@@ -239,7 +240,7 @@ export default function RequestDetailPage({ params }: PageProps) {
     let itemsToSave = items;
     if (itemsToSave.length === 0 && pendingDeleteIds.size === 0) {
       const inferred = visibleGoldenItems
-        .map((item) => ({
+        .map((item: GoldenRequestedItemModel) => ({
           goldenItemId: item.id,
           correctedFractionId: item.fractionId,
           masterItemAction: MasterItemAction.NONE,
