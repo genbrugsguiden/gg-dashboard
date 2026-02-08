@@ -34,7 +34,6 @@ import type {
   RequestedItemModel,
   GoldenRequestModel,
   GoldenRequestedItemModel,
-  MasterItemAction,
 } from '@/types/graphql';
 
 interface PageProps {
